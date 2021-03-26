@@ -12,18 +12,18 @@ export function authenticateAccessToken(req: Request, res: express.Response, nex
     jwt.verify(token, process.env.TOKEN_SECRET as string, async (err: any, tokenUser: any) => {
       if (err) {
         console.log(err)
-        return res.sendStatus(403)
+        return res.status(401).json({error: "Unauthorized"})
       }
 
       const user = await getPublicUser(tokenUser.email)
       if (!user) {
-        return res.sendStatus(403)
+        return res.status(401).json({error: "Unauthorized"})
       }
 
       req.user = user
       next()
     })
   } else {
-    res.sendStatus(401)
+    res.status(401).json({error: "Unauthorized"})
   }
 }

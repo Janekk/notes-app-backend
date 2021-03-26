@@ -1,9 +1,9 @@
-import express, { NextFunction } from "express"
-import { authenticateAccessToken } from "../middlewares"
-import { NotePermissionTypes, Request, RequestWithUser } from "../utils"
-import { body, validationResult } from "express-validator"
-import { createUserNote, getUserNotes, getUserNote, getNote, shareNote, updateNote } from "../services/noteService"
-import { getUser } from "../services/userService"
+import express, {NextFunction} from "express"
+import {authenticateAccessToken} from "../middlewares"
+import {NotePermissionTypes, Request, RequestWithUser} from "../utils"
+import {body, validationResult} from "express-validator"
+import {createUserNote, getUserNotes, getUserNote, getNote, shareNote, updateNote} from "../services/noteService"
+import {getUser} from "../services/userService"
 
 const router = express.Router()
 
@@ -29,9 +29,9 @@ router.get("/:id", authenticateAccessToken, async (req: Request, res, next: Next
   try {
     const note = await getNote(req.params.id)
     if (note) {
-      return res.sendStatus(403)
+      return res.status(403).json({error: "Cannot access this note"})
     }
-    return res.sendStatus(404)
+    return res.status(404).json({error: "Note not found"})
   } catch (e) {
     next(e)
   }
@@ -39,7 +39,7 @@ router.get("/:id", authenticateAccessToken, async (req: Request, res, next: Next
 
 // create note
 router.post("/", authenticateAccessToken, async (req: Request, res, next: NextFunction) => {
-  const { title, content } = req.body
+  const {title, content} = req.body
   const withUser = <RequestWithUser>req
   try {
     const userNote = await createUserNote(withUser.user, title, content)
@@ -51,49 +51,54 @@ router.post("/", authenticateAccessToken, async (req: Request, res, next: NextFu
 
 // edit note
 router.patch("/:id", authenticateAccessToken, async (req: Request, res, next: NextFunction) => {
-  const { title, content } = req.body
+  const {title, content} = req.body
   const withUser = <RequestWithUser>req
   try {
-    const userNote = await updateNote(req.params.id, title, content)
+    const userNote = await updateNote(withUser.user, req.params.id, title, content)
     return res.json(userNote)
   } catch (e) {
     next(e)
   }
 })
 
-router.post("/:id/share", authenticateAccessToken, body("email").isEmail(), async (req: Request, res, next: NextFunction) => {
-  const errors = validationResult(req)
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() })
-  }
-
-  try {
-    const withUser = <RequestWithUser>req
-    const myShare = await getUserNote(withUser.user, req.params.id)
-
-    if (!myShare) {
-      return res.status(400).json({ error: "Could not share this note" })
+router.post(
+  "/:id/share",
+  authenticateAccessToken,
+  body("email").isEmail(),
+  async (req: Request, res, next: NextFunction) => {
+    const errors = validationResult(req)
+    if (!errors.isEmpty()) {
+      return res.status(400).json({errors: errors.array()})
     }
 
-    if (myShare.permissionType != NotePermissionTypes.Edit) {
-      return res.status(400).json({ error: "Only editors can share not with other users" })
-    }
+    try {
+      const withUser = <RequestWithUser>req
+      const myShare = await getUserNote(withUser.user, req.params.id)
 
-    const recipient = await getUser(req.body.email)
-    if (!recipient) {
-      return res.status(400).json({ error: "Could not share this note" })
-    }
+      if (!myShare) {
+        return res.status(400).json({error: "Could not share this note"})
+      }
 
-    const share = await shareNote(
-      req.params.id,
-      Number(recipient?.id),
-      new Date(req.body.validUntil),
-      NotePermissionTypes.View,
-    )
-    return res.json(share)
-  } catch (e) {
-    next(e)
-  }
-})
+      if (myShare.permissionType != NotePermissionTypes.Edit) {
+        return res.status(400).json({error: "Only editors can share not with other users"})
+      }
+
+      const recipient = await getUser(req.body.email)
+      if (!recipient) {
+        return res.status(400).json({error: "There is no user account for this email address yet."})
+      }
+
+      const share = await shareNote(
+        req.params.id,
+        Number(recipient?.id),
+        new Date(req.body.validUntil),
+        NotePermissionTypes.View,
+      )
+      return res.json(share)
+    } catch (e) {
+      next(e)
+    }
+  },
+)
 
 export default router

@@ -28,7 +28,11 @@ export async function getUserNotes(user: PublicUser) {
   })
 }
 
-export async function getUserNote(user: PublicUser, noteId: string, validOnly: boolean = true): Promise<UserNote | null> {
+export async function getUserNote(
+  user: PublicUser,
+  noteId: string,
+  validOnly: boolean = true,
+): Promise<UserNote | null> {
   const userNote: any = await prisma.userNote.findUnique({
     where: {
       noteId_userId: {
@@ -58,16 +62,25 @@ export async function getNote(id: string): Promise<Note | null> {
   })
 }
 
-export async function updateNote(id: string, title: string, content: string): Promise<Note | null> {
-  console.log('updateNote', id, title, content);
-  return prisma.note.update({
+export async function updateNote(user: PublicUser, id: string, title: string, content: string): Promise<UserNote | null> {
+
+  console.log('updateNote', id, title, content)
+
+  return prisma.userNote.update({
     where: {
-      id,
+      noteId_userId: {
+        noteId: id,
+        userId: user.id,
+      },
     },
     data: {
-      title,
-      content
-    }
+      note: {
+        update: {
+          title,
+          content
+        }
+      }
+    },
   })
 }
 
